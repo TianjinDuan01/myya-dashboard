@@ -1,26 +1,284 @@
-# myya.py — Interactive BI-style Dashboard (CEO/Website-ready, minimal jargon)
-# Run: streamlit run myya.py
-
-import os
+import io
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.express as px
-
-from scipy.stats import spearmanr, chi2_contingency
-from sklearn.model_selection import train_test_split
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.ensemble import RandomForestClassifier
+import plotly.graph_objects as go
+import requests
+from scipy.stats import chi2_contingency
 
 
 # =========================
 # CONFIG
 # =========================
-# ---- DATA LOADING (URL ONLY) ----
-data_url = data_url_input.strip() or get_data_url()
+TARGET_BRA = "Myya Bra"
+TARGET_SIZE = "Myya Bra Size"
+OTHER_BRA_COLS = ["Other Bra 1", "Other Bra 2"]
+
+SEGMENT_FIELDS = [
+    "Patient Surgery Type",
+    "Breast Projection (Profile)",
+    "Side",
+    "Patient Age",
+    "Bra Size (Band Size)",
+    "Underbust Measurement (in)",
+]
+
+BUSINESS_DRIVER_CANDIDATES = [
+    "Patient Surgery Type",
+    "Breast Projection (Profile)",
+    "Underbust Measurement (in)",
+    "Bra Size (Band Size)",
+    "Patient Age",
+]
+
+DRIVER_EXPLANATIONS_BUSINESS = {
+    "Patient Surgery Type": "Different pathways create different constraints—standardization reduces exceptions and rework.",
+    "Breast Projection (Profile)": "Key differentiator that helps avoid trial-and-error and improves repeatability.",
+    "Underbust Measurement (in)": "Better measurement completeness improves consistency and reduces sizing ambiguity.",
+    "Bra Size (Band Size)": "Familiar anchor that helps standardize across brand inconsistencies.",
+    "Patient Age": "May reflect comfort/stability preferences; helps tailor without losing consistency.",
+}
+
+# Data URL config
+DEFAULT_DATA_URL = ""          # optional fallback
+DATA_URL_QUERY_KEY = "data"    # https://xxx.streamlit.app/?data=https://...csv
+REQUEST_TIMEOUT = 30
+
+# Brand accent (Myya Pink)
+PINK = "#ff2d7a"
+PINK_SOFT = "#ffe4ee"
+INK = "#111827"
+MUTED = "#6b7280"
+
+
+# =========================
+# STREAMLIT PAGE
+# =========================
+st.set_page_config(page_title="Myya — Executive Story", layout="wide")
+
+st.markdown(
+    f"""
+<style>
+#MainMenu {{visibility: hidden;}}
+footer {{visibility: hidden;}}
+header {{visibility: hidden;}}
+.block-container {{padding-top: 1.0rem; padding-bottom: 2.6rem; max-width: 1180px;}}
+
+.smallcap {{font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: {MUTED};}}
+.heroTitle {{font-size: 46px; font-weight: 950; line-height: 1.05; margin: 8px 0 10px; color:{INK};}}
+.heroSub {{font-size: 18px; color: #374151; max-width: 980px; line-height: 1.55;}}
+
+.storyBlock {{padding: 14px 0 6px;}}
+.blockKicker {{font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: {MUTED}; margin-bottom: 6px;}}
+.blockHeadline {{font-size: 26px; font-weight: 950; margin: 0 0 6px; color: {INK};}}
+.blockBody {{font-size: 14px; color: #4b5563; margin: 0 0 10px; line-height: 1.55;}}
+
+.card {{border: 1px solid #ececec; border-radius: 16px; padding: 14px 16px; background: #fff;}}
+.cardPink {{border: 1px solid {PINK_SOFT}; background: linear-gradient(180deg, #ffffff 0%, {PINK_SOFT} 160%);}}
+.cardTitle {{font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: {MUTED}; margin-bottom: 6px;}}
+.cardValue {{font-size: 30px; font-weight: 950; color: {INK}; line-height: 1.1;}}
+.cardNote {{font-size: 13px; color: #4b5563; margin-top: 6px; line-height: 1.35;}}
+
+.divider {{border: none; border-top: 1px solid #f1f1f1; margin: 18px 0;}}
+.pill {{
+  display:inline-block; padding: 6px 10px; border-radius: 999px;
+  background: {PINK_SOFT}; color:{PINK}; font-size: 12px; font-weight: 800;
+  margin-right: 6px; border: 1px solid {PINK_SOFT};
+}}
+</style>
+    """,
+    unsafe_allow_html=True
+)
+
+PLOTLY_LAYOUT_BASE = dict(
+    margin=dict(l=10, r=10, t=55, b=10),
+    font=dict(family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial", size=13, color=INK),
+    title=dict(font=dict(size=16, color=INK)),
+)
+
+
+# =========================
+# RENDER HELPERS (compat across Streamlit versions)
+# =========================
+def plot(fig):
+    """Plotly chart, uses stretch width if supported."""
+    try:
+        st.plotly_chart(fig, width="stretch")
+    except TypeError:
+        st.plotly_chart(fig, use_container_width=True)
+
+def table(df, height=260):
+    """Dataframe, uses stretch width if supported."""
+    try:
+        st.dataframe(df, width="stretch", height=height)
+    except TypeError:
+        st.dataframe(df, use_container_width=True, height=height)
+
+
+# =========================
+# DATA + STATS HELPERS
+# =========================
+def series_clean_str(s: pd.Series) -> pd.Series:
+    s = s.astype(str).str.strip()
+    s = s.replace({"": np.nan, "nan": np.nan, "None": np.nan, "—": np.nan, "–": np.nan})
+    return s
+
+def pct(x, digits=0):
+    if pd.isna(x):
+        return "—"
+    return f"{x*100:.{digits}f}%"
+
+def safe_nunique(s: pd.Series) -> int:
+    return int(s.dropna().nunique()) if s is not None else 0
+
+def interval_to_label(x):
+    if isinstance(x, pd.Interval):
+        return f"{x.left:g}–{x.right:g}"
+    return str(x)
+
+def cramers_v(cm: np.ndarray) -> float:
+    if cm.size == 0:
+        return np.nan
+    chi2, _, _, _ = chi2_contingency(cm)
+    n = cm.sum()
+    if n <= 1:
+        return np.nan
+    r, k = cm.shape
+    denom = min(k - 1, r - 1)
+    if denom <= 0:
+        return np.nan
+    return float(np.sqrt((chi2 / n) / denom))
+
+def eta_squared_by_groups(num: pd.Series, grp: pd.Series) -> float:
+    sub = pd.DataFrame({"num": num, "grp": grp}).dropna()
+    if sub.empty or sub["grp"].nunique() < 2:
+        return np.nan
+    grand_mean = sub["num"].mean()
+    ss_total = ((sub["num"] - grand_mean) ** 2).sum()
+    if ss_total <= 0:
+        return np.nan
+    ss_between = sub.groupby("grp")["num"].apply(lambda x: len(x) * (x.mean() - grand_mean) ** 2).sum()
+    return float(ss_between / ss_total)
+
+def driver_strength_internal(df, feature, target_cat):
+    # method labels intentionally hidden; internal scoring only
+    if feature not in df.columns or target_cat not in df.columns:
+        return np.nan
+    if pd.api.types.is_numeric_dtype(df[feature]):
+        return eta_squared_by_groups(df[feature], df[target_cat])
+    sub = df[[feature, target_cat]].dropna()
+    if sub.empty:
+        return np.nan
+    ct = pd.crosstab(sub[feature], sub[target_cat]).values
+    return cramers_v(ct)
+
+def impact_level(v: float) -> str:
+    if pd.isna(v): return "—"
+    if v >= 0.30: return "High"
+    if v >= 0.10: return "Medium"
+    return "Low"
+
+def hhi(shares: np.ndarray) -> float:
+    if shares is None or len(shares) == 0:
+        return np.nan
+    return float(np.sum(np.square(shares)))
+
+def card(title, value, note, pink=False):
+    cls = "card cardPink" if pink else "card"
+    st.markdown(
+        f"""
+<div class="{cls}">
+  <div class="cardTitle">{title}</div>
+  <div class="cardValue">{value}</div>
+  <div class="cardNote">{note}</div>
+</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+@st.cache_data(show_spinner=False)
+def load_and_clean_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [c.strip() for c in df.columns]
+
+    key_col = "Patient ID (Actual - Primary Key)"
+    if key_col in df.columns:
+        df[key_col] = df[key_col].astype(str).str.strip()
+        df = df[df[key_col] != "EHR Data"].copy()
+
+    for c in df.columns:
+        if df[c].dtype == object:
+            df[c] = series_clean_str(df[c])
+
+    for c in ["Patient Surgery Type", "Side", "Breast Projection (Profile)"]:
+        if c in df.columns:
+            df[c] = series_clean_str(df[c]).str.replace(r"\s+", " ", regex=True).str.title()
+
+    for c in ["Patient Age", "Underbust Measurement (in)", "Bra Size (Band Size)", "Sternum→Back (in)"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    return df
+
+def normalize_data_url(url: str) -> str:
+    url = (url or "").strip()
+    if not url:
+        return url
+    # Google Drive share link -> direct download
+    if "drive.google.com" in url and "/file/d/" in url:
+        file_id = url.split("/file/d/")[1].split("/")[0]
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
+    return url
+
+@st.cache_data(show_spinner=False)
+def load_csv_from_url(url: str) -> pd.DataFrame:
+    url = normalize_data_url(url)
+    r = requests.get(url, timeout=REQUEST_TIMEOUT)
+    r.raise_for_status()
+    return pd.read_csv(io.BytesIO(r.content))
+
+def get_data_url() -> str:
+    # 1) Streamlit secrets (Cloud). Local run may have no secrets.toml -> must not crash.
+    try:
+        if "DATA_URL" in st.secrets and str(st.secrets["DATA_URL"]).strip():
+            return str(st.secrets["DATA_URL"]).strip()
+    except Exception:
+        pass
+
+    # 2) Query param (?data=...)
+    try:
+        qp = st.query_params
+        if DATA_URL_QUERY_KEY in qp and str(qp[DATA_URL_QUERY_KEY]).strip():
+            return str(qp[DATA_URL_QUERY_KEY]).strip()
+    except Exception:
+        pass
+
+    # 3) Default fallback
+    return DEFAULT_DATA_URL
+
+
+# =========================
+# SIDEBAR (URL + global controls FIRST)
+# =========================
+with st.sidebar:
+    st.markdown("## Data source")
+    data_url_input = st.text_input(
+        "CSV URL (optional override)",
+        value="",
+        placeholder="https://.../your.csv",
+        help="Leave empty to use Streamlit Secrets (DATA_URL) or ?data= query param."
+    )
+
+    st.markdown("## Controls")
+    top_n = st.slider("Top N items", 5, 20, 10)
+    show_details = st.toggle("Show detail tables", value=False)
+
+
+# =========================
+# LOAD DATA (MUST happen AFTER data_url_input exists)
+# =========================
+data_url = (data_url_input or "").strip() or get_data_url()
 data_url = normalize_data_url(data_url)
 
 if not data_url:
@@ -41,244 +299,7 @@ except Exception as e:
 
 df = load_and_clean_df(raw_df)
 
-TARGET_BRA = "Myya Bra"
-TARGET_SIZE = "Myya Bra Size"
-OTHER_BRA_COLS = ["Other Bra 1", "Other Bra 2"]
-
-# Candidate drivers (keep close to your original BI concept)
-DRIVER_CANDIDATES = [
-    "Underbust Measurement (in)",
-    "Bra Size (Band Size)",
-    "Bra Size (Cup Size)",
-    "Breast Projection (Profile)",
-    "Patient Surgery Type",
-    "Side",
-    "Patient Age",
-    "Sternum→Back (in)",
-]
-
-SEGMENT_CANDIDATES = [
-    "Underbust Measurement (in)",
-    "Bra Size (Band Size)",
-    "Patient Age",
-    "Patient Surgery Type",
-    "Side",
-    "Breast Projection (Profile)",
-]
-
-DRIVER_EXPLANATIONS = {
-    "Underbust Measurement (in)": "Anchors sizing decisions and reduces guesswork.",
-    "Bra Size (Band Size)": "Clinician-familiar input that stabilizes recommendations.",
-    "Bra Size (Cup Size)": "Adds volume context alongside band measurement.",
-    "Breast Projection (Profile)": "Key differentiator for post-op fit and comfort.",
-    "Patient Surgery Type": "Reconstruction context changes fit constraints.",
-    "Side": "Laterality can reflect asymmetry and fit needs.",
-    "Patient Age": "May correlate with comfort and preference differences.",
-    "Sternum→Back (in)": "Adds torso geometry context for stability and comfort.",
-}
-
-
-# =========================
-# STREAMLIT SETUP
-# =========================
-st.set_page_config(page_title="Myya Dashboard", layout="wide")
-
-
-# =========================
-# HELPERS
-# =========================
-def exists(df, c): 
-    return c in df.columns
-
-def is_num(df, c):
-    return exists(df, c) and pd.api.types.is_numeric_dtype(df[c])
-
-def safe_nunique(s: pd.Series) -> int:
-    if s is None or s.empty:
-        return 0
-    return int(s.dropna().nunique())
-
-def pct(x, digits=0):
-    if pd.isna(x):
-        return "—"
-    return f"{x*100:.{digits}f}%"
-
-def series_clean_str(s: pd.Series) -> pd.Series:
-    s = s.astype(str).str.strip()
-    s = s.replace({"": np.nan, "nan": np.nan, "None": np.nan, "—": np.nan, "–": np.nan})
-    return s
-
-def cramers_v(cm: np.ndarray) -> float:
-    if cm.size == 0:
-        return np.nan
-    chi2, _, _, _ = chi2_contingency(cm)
-    n = cm.sum()
-    if n <= 1:
-        return np.nan
-    r, k = cm.shape
-    denom = min(k - 1, r - 1)
-    if denom <= 0:
-        return np.nan
-    return float(np.sqrt((chi2 / n) / denom))
-
-def spearman_abs(df, x, y):
-    sub = df[[x, y]].dropna()
-    if len(sub) < 3:
-        return np.nan
-    rho, _ = spearmanr(sub[x], sub[y])
-    return float(abs(rho))
-
-def eta_squared_by_groups(num: pd.Series, grp: pd.Series) -> float:
-    sub = pd.DataFrame({"num": num, "grp": grp}).dropna()
-    if sub.empty:
-        return np.nan
-    if sub["grp"].nunique() < 2:
-        return np.nan
-    grand_mean = sub["num"].mean()
-    ss_total = ((sub["num"] - grand_mean) ** 2).sum()
-    if ss_total <= 0:
-        return np.nan
-    ss_between = sub.groupby("grp")["num"].apply(lambda x: len(x) * (x.mean() - grand_mean) ** 2).sum()
-    return float(ss_between / ss_total)
-
-def driver_strength(df, feature, target):
-    """
-    We compute a robust impact strength score internally.
-    We do NOT expose the method name to the UI.
-    """
-    if feature not in df.columns or target not in df.columns:
-        return np.nan
-
-    x = df[feature]
-    y = df[target]
-    x_is_num = pd.api.types.is_numeric_dtype(x)
-    y_is_num = pd.api.types.is_numeric_dtype(y)
-
-    if x_is_num and y_is_num:
-        return spearman_abs(df, feature, target)
-
-    if (not x_is_num) and (not y_is_num):
-        sub = df[[feature, target]].dropna()
-        if sub.empty:
-            return np.nan
-        ct = pd.crosstab(sub[feature], sub[target]).values
-        return cramers_v(ct)
-
-    if (not x_is_num) and y_is_num:
-        return eta_squared_by_groups(df[target], df[feature])
-
-    if x_is_num and (not y_is_num):
-        return eta_squared_by_groups(df[feature], df[target])
-
-    return np.nan
-
-def strength_level(v: float) -> str:
-    if pd.isna(v):
-        return "—"
-    if v < 0.10:
-        return "Low"
-    if v < 0.30:
-        return "Medium"
-    return "High"
-
-def interval_to_segment_label(x):
-    # Converts pandas.Interval or other types into a JSON-safe, readable label
-    if isinstance(x, pd.Interval):
-        return f"{x.left:g}–{x.right:g}"
-    return str(x)
-
-@st.cache_data(show_spinner=False)
-def load_and_clean(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    df.columns = [c.strip() for c in df.columns]
-
-    key_col = "Patient ID (Actual - Primary Key)"
-    if key_col in df.columns:
-        df[key_col] = df[key_col].astype(str).str.strip()
-        df = df[df[key_col] != "EHR Data"].copy()
-
-    for c in df.columns:
-        if df[c].dtype == object:
-            df[c] = series_clean_str(df[c])
-
-    # normalize a few common categoricals
-    for c in ["Patient Surgery Type", "Side", "Breast Projection (Profile)"]:
-        if exists(df, c):
-            df[c] = series_clean_str(df[c]).str.replace(r"\s+", " ", regex=True).str.title()
-
-    # numeric coercion
-    for c in ["Patient Age", "Underbust Measurement (in)", "Bra Size (Band Size)", "Sternum→Back (in)"]:
-        if exists(df, c):
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    return df
-
-def train_reco_model(df, features, target):
-    """
-    Recommendation engine for interactive Figure 2.
-    Robust split: avoid stratify crash on tiny classes.
-    """
-    X = df[features].copy()
-    y = df[target].copy()
-
-    valid = y.notna()
-    X = X.loc[valid]
-    y = y.loc[valid]
-
-    if len(X) < 20 or y.nunique(dropna=True) < 2:
-        return None, "Not enough data in this view to generate recommendations."
-
-    num_cols = [c for c in features if pd.api.types.is_numeric_dtype(df[c])]
-    cat_cols = [c for c in features if c not in num_cols]
-
-    pre = ColumnTransformer(
-        transformers=[
-            ("num", SimpleImputer(strategy="median"), num_cols),
-            ("cat", Pipeline([
-                ("imp", SimpleImputer(strategy="most_frequent")),
-                ("oh", OneHotEncoder(handle_unknown="ignore"))
-            ]), cat_cols),
-        ],
-        remainder="drop"
-    )
-
-    clf = RandomForestClassifier(
-        n_estimators=400,
-        random_state=42,
-        class_weight="balanced_subsample"
-    )
-
-    model = Pipeline([("prep", pre), ("rf", clf)])
-
-    y_counts = y.value_counts(dropna=False)
-    min_count = int(y_counts.min()) if not y_counts.empty else 0
-    do_stratify = (y.nunique(dropna=True) > 1) and (min_count >= 2)
-
-    test_size = 0.25
-    if do_stratify:
-        n_classes = int(y.nunique(dropna=True))
-        min_test = n_classes / max(len(y), 1)
-        test_size = max(test_size, min(0.4, min_test))
-
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y,
-        test_size=test_size,
-        random_state=42,
-        stratify=y if do_stratify else None
-    )
-
-    model.fit(X_tr, y_tr)
-    return model, None
-
-
-# =========================
-# LOAD DATA
-# =========================
-if not os.path.exists(DATA_PATH):
-    st.error(f"Dataset not found at:\n{DATA_PATH}\n\nUpdate DATA_PATH in myya.py.")
-    st.stop()
-
-df = load_and_clean(DATA_PATH)
+# Validate required columns early
 for req in [TARGET_BRA, TARGET_SIZE]:
     if req not in df.columns:
         st.error(f"Missing required column: {req}")
@@ -286,45 +307,46 @@ for req in [TARGET_BRA, TARGET_SIZE]:
 
 
 # =========================
-# SIDEBAR FILTERS (keep close to your original)
+# SIDEBAR (filters AFTER data loaded)
 # =========================
 with st.sidebar:
+    st.divider()
     st.markdown("## Filters")
-    st.caption("These apply to all visuals and recommendations.")
+    st.caption("Filters apply to the whole story.")
 
-    def multiselect_filter(col):
-        if not exists(df, col):
+    def multiselect_filter(col, df_):
+        if col not in df_.columns:
             return None
-        opts = sorted(df[col].dropna().astype(str).unique().tolist())
+        opts = sorted(df_[col].dropna().astype(str).unique().tolist())
         if not opts:
             return None
         return st.multiselect(col, opts, default=opts)
 
-    f_side = multiselect_filter("Side")
-    f_surg = multiselect_filter("Patient Surgery Type")
-    f_proj = multiselect_filter("Breast Projection (Profile)")
+    f_surg = multiselect_filter("Patient Surgery Type", df)
+    f_proj = multiselect_filter("Breast Projection (Profile)", df)
+    f_side = multiselect_filter("Side", df)
 
     age_range = None
-    if is_num(df, "Patient Age") and df["Patient Age"].notna().any():
-        mn = float(df["Patient Age"].min())
-        mx = float(df["Patient Age"].max())
-        age_range = st.slider("Patient Age Range", mn, mx, (mn, mx))
+    if "Patient Age" in df.columns and pd.api.types.is_numeric_dtype(df["Patient Age"]) and df["Patient Age"].notna().any():
+        mn, mx = float(df["Patient Age"].min()), float(df["Patient Age"].max())
+        age_range = st.slider("Age range", mn, mx, (mn, mx))
 
     st.divider()
-    st.markdown("## Display")
-    top_n = st.slider("Top N", 4, 15, 8)
-    show_what_if = st.toggle("Enable interactive recommendation (Figure 2)", value=True)
+    driver_options = [c for c in BUSINESS_DRIVER_CANDIDATES if c in df.columns]
+    picked_driver = st.selectbox("Driver spotlight", driver_options, index=0 if driver_options else 0)
 
 
-# Apply filters
+# =========================
+# APPLY FILTERS
+# =========================
 df_f = df.copy()
-if f_side is not None:
-    df_f = df_f[df_f["Side"].astype(str).isin(f_side)]
 if f_surg is not None:
     df_f = df_f[df_f["Patient Surgery Type"].astype(str).isin(f_surg)]
 if f_proj is not None:
     df_f = df_f[df_f["Breast Projection (Profile)"].astype(str).isin(f_proj)]
-if age_range is not None and "Patient Age" in df_f.columns:
+if f_side is not None:
+    df_f = df_f[df_f["Side"].astype(str).isin(f_side)]
+if age_range is not None:
     df_f = df_f[df_f["Patient Age"].between(age_range[0], age_range[1], inclusive="both")]
 
 if len(df_f) < 5:
@@ -333,427 +355,362 @@ if len(df_f) < 5:
 
 
 # =========================
-# HEADER
+# HERO
 # =========================
+st.markdown('<div class="smallcap">Myya • Executive Story</div>', unsafe_allow_html=True)
+st.markdown('<div class="heroTitle">Myya wins against alternatives</div>', unsafe_allow_html=True)
 st.markdown(
     """
-    <div style="padding:6px 0 10px 0;">
-      <div style="font-size:14px; letter-spacing:0.08em; text-transform:uppercase; color:#666;">
-        Myya Dashboard
-      </div>
-      <div style="font-size:36px; font-weight:850; line-height:1.05; margin-top:8px;">
-        Key Influencers • Segmentation • Recommendation • Competitive Alternatives
-      </div>
-    </div>
+<div class="heroSub">
+This page is designed for CEOs and website visitors: it starts with replacement proof in real-world decisions,
+explains what drives repeatability, and ends with where to scale next.
+</div>
+<hr class="divider"/>
     """,
     unsafe_allow_html=True
 )
 
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Rows (filtered)", f"{len(df_f):,}")
-k2.metric("Myya bra types", f"{safe_nunique(df_f[TARGET_BRA]):,}")
-k3.metric("Myya sizes", f"{safe_nunique(df_f[TARGET_SIZE]):,}")
-if exists(df_f, "Underbust Measurement (in)"):
-    k4.metric("Missing underbust", pct(df_f["Underbust Measurement (in)"].isna().mean()))
+
+# =========================
+# KPIs (replacement-first)
+# =========================
+cases = len(df_f)
+bra_types = safe_nunique(df_f[TARGET_BRA])
+size_types = safe_nunique(df_f[TARGET_SIZE])
+underbust_missing = df_f["Underbust Measurement (in)"].isna().mean() if "Underbust Measurement (in)" in df_f.columns else np.nan
+
+available_other = [c for c in OTHER_BRA_COLS if c in df_f.columns]
+win_rate = None
+considered = None
+most_replaced = None
+
+if available_other:
+    tmp = df_f[[TARGET_BRA] + available_other].copy()
+    tmp["competitor_mentioned"] = tmp[available_other].notna().any(axis=1)
+    considered = int(tmp["competitor_mentioned"].sum())
+    selected_anyway = int(tmp.loc[tmp["competitor_mentioned"], TARGET_BRA].notna().sum())
+    win_rate = selected_anyway / max(considered, 1)
+
+    myya_set = set(df_f[TARGET_BRA].dropna().astype(str).str.strip().unique().tolist())
+    melted0 = tmp.melt(id_vars=[TARGET_BRA], value_vars=available_other, value_name="competitor").dropna(subset=["competitor", TARGET_BRA])
+    melted0["competitor"] = melted0["competitor"].astype(str).str.strip()
+    melted0[TARGET_BRA] = melted0[TARGET_BRA].astype(str).str.strip()
+    melted0 = melted0[~melted0["competitor"].isin(myya_set)]
+    if not melted0.empty:
+        most_replaced = melted0["competitor"].value_counts().index[0]
+
+k1, k2, k3, k4, k5 = st.columns(5)
+with k1: card("Cases in view", f"{cases:,}", "Filtered scope")
+with k2: card("Alternatives considered", f"{considered:,}" if considered is not None else "—", "Cases with a competitor listed", pink=True)
+with k3: card("Myya selected anyway", pct(win_rate, 0) if win_rate is not None else "—", "Replacement evidence", pink=True)
+with k4: card("Most replaced alternative", most_replaced if most_replaced is not None else "—", "Top competitor mentioned")
+with k5: card("Measurement completeness", pct(1-underbust_missing, 0) if pd.notna(underbust_missing) else "—", "Underbust recorded")
+
+st.caption(f"CSV URL: {data_url}")
+
+
+# =========================
+# STORY BLOCK 1 — Proof (Replacement)
+# =========================
+st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
+st.markdown('<div class="blockKicker">Proof</div>', unsafe_allow_html=True)
+
+if not available_other:
+    st.markdown('<div class="blockHeadline">Replacement proof requires competitor fields.</div>', unsafe_allow_html=True)
+    st.info("Competitive evidence requires 'Other Bra 1/2' columns (not found in this dataset).")
 else:
-    k4.metric("Missing underbust", "—")
-
-st.caption(f"Data source (fixed): {DATA_PATH}")
-
-
-# =========================
-# TABS (keep your original structure)
-# =========================
-tabs = st.tabs([
-    "Overview",
-    "Drivers",
-    "Segmentation",
-    "Recommendation",
-    "Alternatives"
-])
-
-
-# =========================
-# TAB: OVERVIEW
-# =========================
-with tabs[0]:
-    st.markdown("## Overview")
-    st.caption("A quick snapshot for CEOs: what’s in view and what Myya is most often selected.")
-
-    c1, c2 = st.columns([0.55, 0.45], gap="large")
-    with c1:
-        if TARGET_BRA in df_f.columns:
-            dist = df_f[TARGET_BRA].dropna().astype(str).value_counts().head(top_n).reset_index()
-            dist.columns = ["Myya Bra", "Count"]
-            fig = px.bar(dist.iloc[::-1], x="Count", y="Myya Bra", orientation="h", title="Top Myya bra types (filtered)")
-            st.plotly_chart(fig, width="stretch")
-        else:
-            st.info("Missing target column for distribution.")
-
-    with c2:
-        st.markdown("### Why sizing fails (context)")
-        st.markdown(
-            """
-- **Brand inconsistency:** same label ≠ same fit  
-- **Anchoring:** band-first or cup-first guessing  
-- **Post-op shape shift:** projection/asymmetry changes fit  
-- **Information friction:** measurements exist, but context isn’t systematically used  
-
-**BI opportunity:** show drivers + explain recommendations so decisions feel obvious.
-            """
-        )
-
-
-# =========================
-# TAB: FIGURE 1 — DRIVERS (hide methods)
-# =========================
-with tabs[1]:
-    st.markdown("## Key Drivers")
-    st.caption("Drivers ranked by influence. We account for numeric and categorical factors internally, but we show only the insights.")
-
-    target_choice = st.selectbox("Analyze drivers for", [TARGET_BRA, TARGET_SIZE], index=0)
-
-    drivers = [c for c in DRIVER_CANDIDATES if c in df_f.columns]
-    rows = []
-    for d in drivers:
-        s = driver_strength(df_f, d, target_choice)
-        rows.append({
-            "Driver": d,
-            "Impact strength": float(s) if pd.notna(s) else np.nan,
-        })
-
-    rank = pd.DataFrame(rows).dropna(subset=["Impact strength"]).sort_values("Impact strength", ascending=False)
-    rank["Impact level"] = rank["Impact strength"].map(strength_level)
-    rank["Explanation"] = rank["Driver"].map(lambda x: DRIVER_EXPLANATIONS.get(x, "Clinically relevant factor influencing fit decisions."))
-
-    left, right = st.columns([0.58, 0.42], gap="large")
-    with left:
-        fig = px.bar(
-            rank.head(top_n).iloc[::-1],
-            x="Impact strength",
-            y="Driver",
-            orientation="h",
-            title="Key drivers (ranked)",
-            hover_data=["Impact level"]
-        )
-        st.plotly_chart(fig, width="stretch")
-
-    with right:
-        focus = st.selectbox("Explain a driver", rank["Driver"].head(top_n).tolist())
-        focus_row = rank[rank["Driver"] == focus].iloc[0]
-        st.markdown("### Plain-language explanation")
-        st.markdown(f"**{focus}** — {focus_row['Explanation']}")
-        st.markdown("### Strength (internal score)")
-        st.progress(min(max(float(focus_row["Impact strength"]), 0.0), 1.0))
-        st.caption("Displayed as an intuitive strength bar (no statistical jargon).")
-
-    st.markdown("### Driver table")
-    st.dataframe(
-        rank.head(top_n)[["Driver", "Impact level", "Impact strength", "Explanation"]],
-        width="stretch",
-        height=320
+    st.markdown(
+        f'<div class="blockHeadline">When alternatives appear, <span class="pill">Myya still gets selected</span> — measurable replacement.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="blockBody">CEO/website-friendly view: which alternatives are most often replaced, and which Myya products win.</div>',
+        unsafe_allow_html=True
     )
 
+    tmp = df_f[[TARGET_BRA] + available_other].copy()
+    myya_set = set(df_f[TARGET_BRA].dropna().astype(str).str.strip().unique().tolist())
 
-# =========================
-# TAB: SEGMENTATION (BI-style) — fix Interval JSON issue
-# =========================
-with tabs[2]:
-    st.markdown("## Segmentation")
-    st.caption("Pick a driver and see how Myya selection shifts by segment. Designed to be understandable without a data background.")
+    melted = tmp.melt(id_vars=[TARGET_BRA], value_vars=available_other, value_name="competitor").dropna(subset=["competitor", TARGET_BRA])
+    melted["competitor"] = melted["competitor"].astype(str).str.strip()
+    melted[TARGET_BRA] = melted[TARGET_BRA].astype(str).str.strip()
+    melted = melted[~melted["competitor"].isin(myya_set)]
 
-    seg_driver = st.selectbox("Segment by driver", [c for c in SEGMENT_CANDIDATES if c in df_f.columns])
-
-    # Prepare segments
-    work = df_f.copy()
-    if is_num(work, seg_driver):
-        # bins chosen to keep readable; you can tweak
-        # qcut can produce Interval -> convert to str later
-        try:
-            work["_segment"] = pd.qcut(work[seg_driver], q=4, duplicates="drop")
-        except Exception:
-            work["_segment"] = pd.cut(work[seg_driver], bins=4)
+    if melted.empty:
+        st.info("Competitor evidence becomes empty after cleaning (competitor fields may contain Myya names).")
     else:
-        work["_segment"] = work[seg_driver].astype(str)
+        left, right = st.columns([0.5, 0.5], gap="large")
 
-    # Make segment JSON-safe
-    work["_segment"] = work["_segment"].map(interval_to_segment_label)
-
-    # Choose outcome to view
-    outcome = st.selectbox("Outcome to compare", [TARGET_BRA, TARGET_SIZE], index=0)
-
-    sub = work[["_segment", outcome]].dropna()
-    if sub.empty:
-        st.info("No data after segmentation for the chosen outcome.")
-    else:
-        seg = (
-            sub.groupby(["_segment", outcome]).size().reset_index(name="count")
-        )
-        seg_tot = seg.groupby("_segment")["count"].sum().reset_index(name="segment_total")
-        seg = seg.merge(seg_tot, on="_segment", how="left")
-        seg["pct"] = seg["count"] / seg["segment_total"]
-
-        left, right = st.columns([0.58, 0.42], gap="large")
         with left:
-            # stacked bar: segment distribution
-            # limit categories for readability
-            top_cats = sub[outcome].value_counts().head(6).index.astype(str).tolist()
-            seg2 = seg[seg[outcome].astype(str).isin(top_cats)].copy()
-            fig = px.bar(
-                seg2,
-                x="pct",
-                y="_segment",
-                color=outcome,
-                orientation="h",
-                title=f"Outcome mix by segment — {seg_driver}",
-                hover_data=["count"]
+            comp_counts = (
+                melted.groupby("competitor").size().reset_index(name="replaced_cases")
+                .sort_values("replaced_cases", ascending=False)
             )
-            st.plotly_chart(fig, width="stretch")
+            comp_counts["share"] = comp_counts["replaced_cases"] / max(comp_counts["replaced_cases"].sum(), 1)
+
+            fig = px.bar(
+                comp_counts.head(top_n).iloc[::-1],
+                x="replaced_cases",
+                y="competitor",
+                orientation="h",
+                title="Most replaced alternatives (Leaderboard)",
+                hover_data={"share": ":.1%"},
+            )
+            fig.update_layout(**PLOTLY_LAYOUT_BASE)
+            plot(fig)
 
         with right:
-            st.markdown("### Segment table (share within segment)")
-            # show top category per segment
-            top_by_seg = (
-                seg.sort_values(["_segment", "pct"], ascending=[True, False])
-                   .groupby("_segment").head(3)
-            )
-            show_df = top_by_seg.rename(columns={"_segment": "segment"})[["segment", outcome, "count", "pct"]]
-            st.dataframe(show_df, width="stretch", height=360)
+            mat = melted.groupby(["competitor", TARGET_BRA]).size().reset_index(name="count")
+            top_comp = mat.groupby("competitor")["count"].sum().sort_values(ascending=False).head(10).index.tolist()
+            top_myya = mat.groupby(TARGET_BRA)["count"].sum().sort_values(ascending=False).head(8).index.tolist()
+            mat2 = mat[mat["competitor"].isin(top_comp) & mat[TARGET_BRA].isin(top_myya)].copy()
+            pivot = mat2.pivot_table(index="competitor", columns=TARGET_BRA, values="count", aggfunc="sum", fill_value=0)
+
+            fig2 = px.imshow(pivot, aspect="auto", title="Replacement map (competitor → selected Myya)")
+            fig2.update_layout(**PLOTLY_LAYOUT_BASE)
+            plot(fig2)
+
+        if show_details:
+            table(melted.head(400), height=280)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =========================
-# TAB: FIGURE 2 — RECOMMENDATION (interactive)
+# STORY BLOCK 2 — Why it wins (Drivers)
 # =========================
-with tabs[3]:
-    st.markdown("## Recommendation")
-    st.caption("A what-if panel: adjust inputs and see suggested Myya bra and size. This is designed for demos.")
+st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
+st.markdown('<div class="blockKicker">Why it wins</div>', unsafe_allow_html=True)
 
-    if not show_what_if:
-        st.info("Interactive recommendation is turned off in the sidebar.")
-    else:
-        # Use top drivers as features (plus a couple of core contexts if present)
-        drivers = [c for c in DRIVER_CANDIDATES if c in df_f.columns]
-        # rank quickly against bra selection to pick stable features
-        tmp_rank = []
-        for d in drivers:
-            tmp_rank.append((d, driver_strength(df_f, d, TARGET_BRA)))
-        tmp_rank = [x for x in tmp_rank if pd.notna(x[1])]
-        tmp_rank.sort(key=lambda x: x[1], reverse=True)
+drivers = [c for c in BUSINESS_DRIVER_CANDIDATES if c in df_f.columns]
+drv_rows = []
+for d in drivers:
+    score = driver_strength_internal(df_f, d, TARGET_BRA)
+    drv_rows.append({"Driver": d, "Strength": float(score) if pd.notna(score) else np.nan})
 
-        base_features = [x[0] for x in tmp_rank[:6]]
-        for extra in ["Patient Surgery Type", "Breast Projection (Profile)", "Side"]:
-            if extra in df_f.columns and extra not in base_features:
-                base_features.append(extra)
+drv = pd.DataFrame(drv_rows).dropna(subset=["Strength"]).sort_values("Strength", ascending=False)
 
-        features = base_features
+if drv.empty:
+    st.info("Not enough data to compute driver ranking in this view.")
+else:
+    top_driver = drv.iloc[0]["Driver"]
+    story_driver = picked_driver if (picked_driver in drv["Driver"].tolist()) else top_driver
 
-        model_bra, err_bra = train_reco_model(df_f, features, TARGET_BRA)
-        model_size, err_size = train_reco_model(df_f, features, TARGET_SIZE)
+    st.markdown(
+        f'<div class="blockHeadline">Myya wins more consistently when <span class="pill">{top_driver}</span> is captured and used well.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="blockBody">We keep this buyer-friendly: plain language only (no method labels). Select a driver and see how the product mix shifts.</div>',
+        unsafe_allow_html=True
+    )
 
-        if model_bra is None or model_size is None:
-            st.info(err_bra or err_size or "Recommendation unavailable for this view.")
-        else:
-            left, right = st.columns([0.55, 0.45], gap="large")
+    L, R = st.columns([0.62, 0.38], gap="large")
 
-            with left:
-                st.markdown("### Inputs")
-                patient = {}
-                for f in features:
-                    if is_num(df_f, f):
-                        default = float(df_f[f].dropna().median()) if df_f[f].dropna().size else 0.0
-                        patient[f] = st.number_input(f, value=default)
-                    else:
-                        opts = sorted(df_f[f].dropna().astype(str).unique().tolist())
-                        patient[f] = st.selectbox(f, options=opts if opts else ["(missing)"])
-
-                p_df = pd.DataFrame([patient])
-
-            with right:
-                st.markdown("### Suggested outcome")
-                bra_pred = model_bra.predict(p_df)[0]
-                size_pred = model_size.predict(p_df)[0]
-
-                c1, c2 = st.columns(2)
-                c1.metric("Suggested Myya bra", str(bra_pred))
-                c2.metric("Suggested size", str(size_pred))
-
-                # Show confidence bars (more interactive & demo-friendly)
-                try:
-                    proba = model_bra.predict_proba(p_df)[0]
-                    classes = model_bra.named_steps["rf"].classes_
-                    prob_df = pd.DataFrame({"Myya Bra": classes.astype(str), "Probability": proba})
-                    prob_df = prob_df.sort_values("Probability", ascending=False).head(5)
-                    fig = px.bar(prob_df.iloc[::-1], x="Probability", y="Myya Bra", orientation="h",
-                                 title="Top suggestions (confidence)")
-                    st.plotly_chart(fig, width="stretch")
-                except Exception:
-                    st.caption("Confidence view unavailable for this model.")
-
-
-# =========================
-# TAB: FIGURE 3 — ALTERNATIVES (more interactive, no Sankey)
-# =========================
-with tabs[4]:
-    st.markdown("## Competitive Alternatives")
-    st.caption("Switch between views to understand which alternatives Myya replaces and where those replacements go.")
-
-    available_other = [c for c in OTHER_BRA_COLS if c in df_f.columns]
-    if not available_other:
-        st.info("This dataset view does not include 'Other Bra 1/2' competitor fields.")
-    else:
-        tmp = df_f[[TARGET_BRA] + available_other].copy()
-        tmp["competitor_mentioned"] = tmp[available_other].notna().any(axis=1)
-
-        total_cases = len(tmp)
-        considered = int(tmp["competitor_mentioned"].sum())
-        selected = int(tmp.loc[tmp["competitor_mentioned"], TARGET_BRA].notna().sum())
-        win_rate = selected / max(considered, 1)
-
-        # Prevent competitor values that equal Myya bra names
-        myya_set = set(df_f[TARGET_BRA].dropna().astype(str).str.strip().unique().tolist())
-
-        comp_series = (
-            tmp.loc[tmp["competitor_mentioned"], available_other]
-              .stack().dropna().astype(str).str.strip()
+    with L:
+        plot_df = drv.head(top_n).copy()
+        plot_df["Highlight"] = np.where(plot_df["Driver"] == story_driver, "Selected", "Other")
+        fig = px.bar(
+            plot_df.iloc[::-1],
+            x="Strength",
+            y="Driver",
+            orientation="h",
+            title="What drives consistent Myya selection",
+            color="Highlight",
         )
-        comp_series = comp_series[~comp_series.isin(myya_set)]
-        most_comp = comp_series.value_counts().index[0] if not comp_series.empty else "—"
+        fig.update_layout(**PLOTLY_LAYOUT_BASE, legend_title_text="")
+        plot(fig)
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Alternatives considered", f"{considered:,}", f"{considered/max(total_cases,1):.0%} of cases")
-        c2.metric("Myya selected anyway", f"{win_rate:.0%}", "Evidence of replacement")
-        c3.metric("Most replaced alternative", most_comp)
-
-        # Build competitor->Myya pairs
-        melted = tmp.melt(
-            id_vars=[TARGET_BRA],
-            value_vars=available_other,
-            value_name="competitor"
-        ).dropna(subset=["competitor", TARGET_BRA])
-
-        melted["competitor"] = melted["competitor"].astype(str).str.strip()
-        melted[TARGET_BRA] = melted[TARGET_BRA].astype(str).str.strip()
-        melted = melted[~melted["competitor"].isin(myya_set)]
-
-        if len(melted) < 2:
-            st.info("Not enough competitor mentions to render charts (after cleaning).")
-        else:
-            view = st.radio(
-                "Choose a view",
-                ["Leaderboard", "Where replacements go (Heatmap)", "Segment drilldown"],
-                horizontal=True
-            )
-
-            # Common controls for interactivity
-            all_comp = melted["competitor"].value_counts().index.tolist()
-            comp_focus = st.selectbox("Focus on a competitor (optional)", ["(All)"] + all_comp)
-
-            if comp_focus != "(All)":
-                melted_v = melted[melted["competitor"] == comp_focus].copy()
-            else:
-                melted_v = melted.copy()
-
-            if view == "Leaderboard":
-                metric = st.selectbox("Metric", ["Replaced cases (count)", "Share of replaced (percent)"], index=0)
-
-                comp_counts = (
-                    melted_v.groupby("competitor").size().reset_index(name="replaced_cases")
-                    .sort_values("replaced_cases", ascending=False)
-                )
-                comp_counts["share"] = comp_counts["replaced_cases"] / max(comp_counts["replaced_cases"].sum(), 1)
-
-                show = comp_counts.head(top_n).copy()
-
-                if metric.startswith("Share"):
-                    fig = px.bar(
-                        show.iloc[::-1],
-                        x="share",
-                        y="competitor",
-                        orientation="h",
-                        title="Replacement leaderboard (share)",
-                        hover_data=["replaced_cases"]
-                    )
-                else:
-                    fig = px.bar(
-                        show.iloc[::-1],
-                        x="replaced_cases",
-                        y="competitor",
-                        orientation="h",
-                        title="Replacement leaderboard (count)",
-                        hover_data=["share"]
-                    )
-                st.plotly_chart(fig, width="stretch")
-
-                st.markdown("### Table")
-                st.dataframe(show, width="stretch", height=280)
-
-            elif view == "Where replacements go (Heatmap)":
-                mat = (
-                    melted_v.groupby(["competitor", TARGET_BRA]).size().reset_index(name="count")
-                )
-                # limit axes for readability
-                top_comp = (
-                    mat.groupby("competitor")["count"].sum().sort_values(ascending=False).head(8).index.tolist()
-                )
-                top_myya = (
-                    mat.groupby(TARGET_BRA)["count"].sum().sort_values(ascending=False).head(6).index.tolist()
-                )
-                mat2 = mat[mat["competitor"].isin(top_comp) & mat[TARGET_BRA].isin(top_myya)].copy()
-                if mat2.empty:
-                    mat2 = mat.copy()
-
-                pivot = mat2.pivot_table(index="competitor", columns=TARGET_BRA, values="count",
-                                         aggfunc="sum", fill_value=0)
-
-                fig = px.imshow(pivot, aspect="auto", title="Replacement matrix (competitor × Myya bra)")
-                st.plotly_chart(fig, width="stretch")
-
-            else:
-                st.markdown("### Segment drilldown")
-                seg_dim = st.selectbox("Break down by", [c for c in ["Patient Surgery Type", "Side", "Breast Projection (Profile)"] if c in df_f.columns])
-                if seg_dim:
-                    # Add segment to melted rows by joining index alignment from df_f
-                    # Safer: rebuild from df_f with id column
-                    df_key = df_f.reset_index().rename(columns={"index": "_rid"})
-                    tmp2 = df_key[["_rid", TARGET_BRA, seg_dim] + available_other].copy()
-                    tmp2["competitor_mentioned"] = tmp2[available_other].notna().any(axis=1)
-
-                    melt2 = tmp2.melt(
-                        id_vars=["_rid", TARGET_BRA, seg_dim],
-                        value_vars=available_other,
-                        value_name="competitor"
-                    ).dropna(subset=["competitor", TARGET_BRA])
-
-                    melt2["competitor"] = melt2["competitor"].astype(str).str.strip()
-                    melt2[TARGET_BRA] = melt2[TARGET_BRA].astype(str).str.strip()
-                    melt2 = melt2[~melt2["competitor"].isin(myya_set)]
-
-                    if comp_focus != "(All)":
-                        melt2 = melt2[melt2["competitor"] == comp_focus]
-
-                    grp = (
-                        melt2.groupby([seg_dim, "competitor"]).size().reset_index(name="count")
-                    )
-                    # take top competitors overall
-                    top_comp = melt2["competitor"].value_counts().head(6).index.tolist()
-                    grp = grp[grp["competitor"].isin(top_comp)].copy()
-
-                    fig = px.bar(
-                        grp,
-                        x="count",
-                        y=seg_dim,
-                        color="competitor",
-                        orientation="h",
-                        title=f"Competitor mentions by {seg_dim}",
-                    )
-                    st.plotly_chart(fig, width="stretch")
-
-        st.markdown("### Why Myya wins (website-friendly copy)")
+    with R:
+        lvl = impact_level(float(drv[drv["Driver"] == story_driver]["Strength"].iloc[0]))
+        meaning = DRIVER_EXPLANATIONS_BUSINESS.get(story_driver, "A measurable input that improves repeatability.")
+        card(f"{lvl} impact", story_driver, meaning, pink=True)
         st.markdown(
-            """
-- **Consistent sizing logic** across clinicians and brands  
-- **Projection-aware fit** that adapts to post-op anatomy  
-- **Lower decision friction** with clear, measurement-based guidance  
-- **Workflow-friendly** inputs clinicians already collect
-            """
+            f"""
+<div class="card" style="margin-top:12px;">
+  <div class="cardTitle">Business takeaway</div>
+  <div class="cardNote">
+    Standardize <b>{story_driver}</b> → fewer exceptions → higher repeatability → faster scaling.
+  </div>
+</div>
+            """,
+            unsafe_allow_html=True
         )
+
+    st.markdown("##### Visual evidence")
+    top_products = df_f[TARGET_BRA].dropna().astype(str).value_counts().head(5).index.tolist()
+    sub = df_f[df_f[TARGET_BRA].astype(str).isin(top_products)].copy()
+
+    if pd.api.types.is_numeric_dtype(sub[story_driver]) if story_driver in sub.columns else False:
+        fig = px.box(
+            sub.dropna(subset=[story_driver, TARGET_BRA]),
+            x=TARGET_BRA,
+            y=story_driver,
+            title=f"{story_driver} distribution across top Myya products",
+        )
+        fig.update_layout(**PLOTLY_LAYOUT_BASE)
+        plot(fig)
+    else:
+        tmp2 = sub.dropna(subset=[story_driver, TARGET_BRA]).copy()
+        tmp2[story_driver] = tmp2[story_driver].astype(str)
+        share = tmp2.groupby([story_driver, TARGET_BRA]).size().reset_index(name="count")
+        tot = share.groupby(story_driver)["count"].sum().reset_index(name="total")
+        share = share.merge(tot, on=story_driver, how="left")
+        share["share"] = share["count"] / share["total"]
+        top_cats = tmp2[story_driver].value_counts().head(8).index.tolist()
+        share = share[share[story_driver].isin(top_cats)]
+        fig = px.bar(
+            share,
+            x="share",
+            y=story_driver,
+            color=TARGET_BRA,
+            orientation="h",
+            title=f"Product share by {story_driver}",
+            hover_data=["count"],
+        )
+        fig.update_layout(**PLOTLY_LAYOUT_BASE)
+        plot(fig)
+
+    if show_details:
+        table(drv, height=240)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+# =========================
+# STORY BLOCK 3 — What gets chosen (Mix)
+# =========================
+st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
+st.markdown('<div class="blockKicker">What gets chosen</div>', unsafe_allow_html=True)
+
+mix = df_f[TARGET_BRA].dropna().astype(str).value_counts()
+mix_df = mix.reset_index()
+mix_df.columns = ["Myya Bra", "Count"]
+mix_df["Share"] = mix_df["Count"] / max(mix_df["Count"].sum(), 1)
+mix_df["CumShare"] = mix_df["Share"].cumsum()
+
+top1 = float(mix_df["Share"].iloc[0]) if len(mix_df) else np.nan
+top3 = float(mix_df["Share"].head(3).sum()) if len(mix_df) else np.nan
+std_index = hhi(mix_df["Share"].values)
+
+st.markdown('<div class="blockHeadline">Selection behavior is measurable — and can be standardized for scale.</div>', unsafe_allow_html=True)
+st.markdown('<div class="blockBody">This supports the win story: consistent selection patterns enable repeatable outcomes.</div>', unsafe_allow_html=True)
+
+a, b, c = st.columns([0.44, 0.28, 0.28], gap="large")
+with a:
+    show = mix_df.head(top_n).copy()
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=show["Myya Bra"], y=show["Count"], name="Count"))
+    fig.add_trace(go.Scatter(x=show["Myya Bra"], y=show["CumShare"], name="Cumulative share", yaxis="y2", mode="lines+markers"))
+    fig.update_layout(
+        **PLOTLY_LAYOUT_BASE,
+        title="Mix concentration (Pareto)",
+        xaxis_title="Myya product",
+        yaxis_title="Count",
+        yaxis2=dict(title="Cumulative share", overlaying="y", side="right", range=[0, 1]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    plot(fig)
+
+with b:
+    card("Top-1 share", pct(top1, 0) if pd.notna(top1) else "—", "Dominant product concentration")
+    card("Top-3 share", pct(top3, 0) if pd.notna(top3) else "—", "Concentration across a small set")
+
+with c:
+    card("Standardization index", f"{std_index:.2f}" if pd.notna(std_index) else "—", "Higher = more concentrated behavior", pink=True)
+    fig2 = px.treemap(mix_df.head(20), path=["Myya Bra"], values="Count", title="Mix map")
+    fig2.update_layout(**PLOTLY_LAYOUT_BASE)
+    plot(fig2)
+
+if show_details:
+    table(mix_df.head(25), height=260)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+# =========================
+# STORY BLOCK 4 — Where to scale next (Segments)
+# =========================
+st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
+st.markdown('<div class="blockKicker">Where to scale next</div>', unsafe_allow_html=True)
+
+seg_options = [c for c in SEGMENT_FIELDS if c in df_f.columns]
+if not seg_options:
+    st.info("No segment fields found in this dataset for the scaling view.")
+else:
+    seg_field = st.selectbox("Segment lens (for scaling decisions)", seg_options, index=0)
+
+    work = df_f.copy()
+    if pd.api.types.is_numeric_dtype(work[seg_field]):
+        try:
+            work["_seg"] = pd.qcut(work[seg_field], q=4, duplicates="drop")
+        except Exception:
+            work["_seg"] = pd.cut(work[seg_field], bins=4)
+        work["_seg"] = work["_seg"].map(interval_to_label)
+    else:
+        work["_seg"] = work[seg_field].astype(str)
+
+    sub = work[["_seg", TARGET_BRA]].dropna()
+    if sub.empty:
+        st.info("Not enough data for segment opportunity charts.")
+    else:
+        st.markdown('<div class="blockHeadline">Prioritize rollout where volume is high — and wins are repeatable.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="blockBody">This helps decide rollout, inventory alignment, and messaging by segment.</div>', unsafe_allow_html=True)
+
+        seg_mix = sub.groupby(["_seg", TARGET_BRA]).size().reset_index(name="count")
+        seg_tot = seg_mix.groupby("_seg")["count"].sum().reset_index(name="total")
+        seg_mix = seg_mix.merge(seg_tot, on="_seg", how="left")
+        seg_mix["share"] = seg_mix["count"] / seg_mix["total"]
+
+        top_products = sub[TARGET_BRA].value_counts().head(7).index.astype(str).tolist()
+        seg_mix = seg_mix[seg_mix[TARGET_BRA].astype(str).isin(top_products)].copy()
+
+        L, R = st.columns([0.62, 0.38], gap="large")
+        with L:
+            fig = px.bar(
+                seg_mix,
+                x="share",
+                y="_seg",
+                color=TARGET_BRA,
+                orientation="h",
+                title=f"Product mix by segment ({seg_field})",
+                hover_data=["count"],
+            )
+            fig.update_layout(**PLOTLY_LAYOUT_BASE)
+            plot(fig)
+
+        with R:
+            seg_size = sub["_seg"].value_counts().reset_index()
+            seg_size.columns = ["Segment", "Cases"]
+            fig2 = px.bar(seg_size.iloc[::-1], x="Cases", y="Segment", orientation="h", title="Segment volume")
+            fig2.update_layout(**PLOTLY_LAYOUT_BASE)
+            plot(fig2)
+
+            if show_details:
+                table(seg_size, height=220)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+# =========================
+# CLOSING
+# =========================
+st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
+st.markdown('<div class="blockKicker">Closing</div>', unsafe_allow_html=True)
+st.markdown('<div class="blockHeadline">This is measurable replacement — not a marketing claim.</div>', unsafe_allow_html=True)
+st.markdown(
+    f"""
+<div class="blockBody">
+For CEOs and customers: <span class="pill">alternatives are considered</span>, and Myya is still selected at a high rate.
+That’s the simplest, most credible story to put on the website — backed by interactive evidence.
+</div>
+    """,
+    unsafe_allow_html=True
+)
+st.caption("Note: Method labels are intentionally hidden to avoid buyer confusion; internal scoring ensures correctness.")
+st.markdown('</div>', unsafe_allow_html=True)
