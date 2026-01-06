@@ -606,13 +606,17 @@ with a:
     fig.add_trace(go.Bar(x=show["Myya Bra"], y=show["Count"], name="Count"))
     fig.add_trace(go.Scatter(x=show["Myya Bra"], y=show["CumShare"], name="Cumulative share", yaxis="y2", mode="lines+markers"))
     fig.update_layout(
-        **PLOTLY_LAYOUT_BASE,
-        title="Mix concentration (Pareto)",
-        xaxis_title="Myya product",
-        yaxis_title="Count",
-        yaxis2=dict(title="Cumulative share", overlaying="y", side="right", range=[0, 1]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
+    **PLOTLY_LAYOUT_BASE,
+    title_text="Mix concentration (Pareto)",
+    xaxis_title="Myya product",
+    yaxis_title="Count",
+    yaxis2=dict(
+        title="Cumulative share",
+        overlaying="y",
+        side="right",
+        range=[0, 1],),
+        )
+
     plot(fig)
 
 with b:
