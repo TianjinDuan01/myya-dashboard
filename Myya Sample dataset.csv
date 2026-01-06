@@ -1,0 +1,103 @@
+﻿Patient ID Count (Foreign Key),Patient ID (Actual - Primary Key),Date of Patient Visit ,Patient Age ,Patient Demographic,Side,Patient Surgery Type,Underbust Measurement (in),Bra Size (Band Size),Bra Size (Cup Size),Breast Projection (Profile),Myya Bra,Myya Bra Size,Other Bra 1,Other Bra 1 Size ,Other Bra 2,Other Bra Size 2,Prosthetic Size ,Fitter Comments,Sternum→Back (in),Assess: Full,Assess: Partial,Assess: Custom,Assess: New Bras,Fitter
+,EHR Data,,,,,Scanned Note Data,,,,,EHR Data ,,,,,,,,,,,,,
+1,11522,11/28/22,71,African American,Right,Mastectomy,37,42,A,Average,Josie,42A,Trulife Emily,40B,Trulife LIly,40B,3,Fitted in Amelia 42 A and tri partial size 4; likes the style of the Barbara,21,—,—,—,—,Deaneas Morris
+2,10762,11/3/21,72,African American,Left,Mastectomy,33,40,B,Shallow,Josie,40B,Josie,40B,Josie,40B,small-shell,Has had a TRAM done,—,—,—,—,—,Deaneas Morris
+3,10885,3/4/22,63,African American,Right,Lumpectomy,38,42,C,—,Josie,42C,Nancy ,42B,JOdee ,42AA,Large-shell,"Large recovery shell; Barbara (black/white); soft lace; Lara 42 A/B (black, nude)",—,No,Yes,No,Yes,—
+4,10953,12/2/21,74,African American,Left,Mastectomy,36,42,E,Average,n/a,n/a,Regalia,42E,Regalia,42E,5,Regalia 42E (special order black; taking home cool grey); Dual Cool Layer 5.,—,—,—,—,—,Deaneas Morris
+5,10954,11/29/21,78,African American,Bilateral,Mastectomy,30,36,D,Shallow,Josie,36D,Regalia,34D,Josie,36D,7,Trulife (2) Dual Cool Layer 7; Regalia 34D beige (ins.); Barbara 36D black & white (ins.); suggests OOP colors.,—,—,—,—,—,Aiesha Taylor
+6,10769,11/13/21,66,African American,Left,Mastectomy,—,—,,Average,n/a,n/a,Nancy ,42G,Regalia,44F,13,Reason: new bras & prosthesis; “new fitting.” (from page images).,—,—,—,—,—,—
+7,7-cannot identify,12/1/21,,,,Mastectomy,—,40,C,Shallow,,,,,,,,—.,—,—,—,—,—,—
+8,11570,1/13/23,60,African American,Right,Mastectomy,34,38,C,Average,Josie,38C,Alexandra,38C,Alexandra,38C,8,Fitted with Alexandra (38C) & Barbara (38C).,—,—,—,—,—,Deaneas Morris
+9,10773,4/13/22,82,African American,Right,Mastectomy,35,40,F,—,Josie,40F,Josie,40F,Josie,40F,10,Needs new prosthesis; 40 DDD/F; Size 8 Dual Cool Layer Encore; follow-up noted.,18,Yes,—,—,Yes,—
+10,11029,1/21/22,56,African American,Right,Mastectomy,39,44,G,Average,n/a,n/a,Regalia,44G,Nancy,44G,Balance 9,Tried multiple prostheses; best fit Amoena-Balance Essential Light VD 9/10 (Tawny); prefers front-closure bras.,—,—,Yes,—,Yes,Aiesha Taylor
+11,11-cannot identify,12/6/21,,,,Mastectomy,33,40,C,Shallow,,,,,,,,Special order: Impressions Shell Medium (110); Lara Satin (Black/Beige); Lara Padded (Black/Off-White).,—,—,Yes,—,Yes,Deaneas Morris
+12,10780,10/28/21,52,African American,Bilateral,Mastectomy,39,44,C/D,—,n/a,n/a,Regalia,50B,Leyla,48B,12,"Tried on Amoena Essential Light (size 12), 50B Regalia; Leyla Post-Surgical Bra (44/46, 48/50).",—,Yes,—,—,Yes,—
+13,10912,11/19/21,78,African American,Right,Lumpectomy,37,42,E,Average,n/a,n/a,Regalia,42E,Lara,42D,XL-shell,Trulife Recovery Shell XL (taking home); Regalia 42E Grey (S/O); Lara Satin 42D Black (take home) & Nude (S/O).,—,—,Yes,—,Yes,Deaneas Morris
+14,10948,12/15/21,72,African American,Right,Mastectomy,35,40,D,Average,Josie,40D,Jessica,40D,Josie,40D,8,— ,19.5,Yes,—,—,Yes,Aiesha Taylor
+15,11134,3/15/22,59,African American,Left,Mastectomy,33,40,A,Shallow,Josie,40A,Josie,40A,Josie,40A,5,Special Order Trulife Barbara Latte in 40 A ,16.5,—,—,—,—,Aiesha Taylor
+16,11170,4/14/22,55,African American,Left,Mastectomy,35,38,DD,Average,Josie,38E,Barbara,38E,Josie,38E,Med-shell,Recovery Shell Medium; Special Order 38 DD Black ,—,Yes,Yes,—,Yes,Aiesha Taylor
+17,10052,10/8/22,63,African American,Left,Mastectomy,34,38,D,Shallow,Josie,38D,Jessica,38D,Jessica,38D,,Special Order Jessica 38 D Nude & White; Barbara 38 D Black; NM 38 D Coffee ,—,—,—,—,—,—
+18,11161,3/28/22,93,White,Right,Mastectomy,31,36,E/F,Shallow,Mae,38D,Alexandra,38D,Alexandra,38D,9,"Amoena Natura Light 9 Ivory 390; Needs more supportive bra (e.g., Elegant Plus / Nancy / Regalia) ",—,Yes,Yes,—,Yes,Aiesha Taylor
+19,11175,4/6/22,37,African American,Bilateral,Mastectomy,39,44,DD/E,Average,Josie,44E,Barbara,44E,Josie,44E,14,"Tried Dual Encore (10,13,14) and Adapt Air (12); Barbara fit great ",—,Yes,Yes,—,Yes,Aiesha Taylor
+20,11066,3/25/22,64,African American,Left,Mastectomy,43,46,DD/E,Average,Josie,46E,Josie,46E,Josie,46E,12,Active lifestyle; size 13 active form and size 12 Dual Encore; special order Barbara & Amethyst ,43.5,Yes,Yes,—,Yes,—
+21,11180,4/27/22,90,White,Right,Mastectomy,33.5,42,D/E,Shallow,Josie,42D,Mae,40B,Josie,42D,7,Special order Trulife prosthesis in Cashmere; Barbara in White & Nude ,—,Yes,Yes,—,—,Aiesha Taylor
+22,11033,3/19/22,63,African American,Left,Mastectomy,33,40,B,Average,Josie,40B,ABC T-shirt,38B,Josie,40B,6,Special order 515 Beige 38B; Barbara 40B Nude & Latte ,—,Yes,Yes,—,Yes,Aiesha Taylor
+23,10731,5/8/22,54,African American,Right,Lumpectomy,—,40,C,—,Marie,40C,Lily,40C,,,6,Likes Lily Bra; special order Lily 40C Black & Pink; 2 active prostheses size 6 ,—,Yes,Yes,—,Yes,Aiesha Taylor
+24,10662,7/24/23,62,African American,Right,Lumpectomy,35,40,D,Average,Marie,38E,Jodee,40D,,,,Fitted with Josie (40 D) and Marie (40 C); prosthesis not needed,—,—,—,—,—,—
+25,11005,9/19/22,64,African American,Right,Lumpectomy,43,46,B,Average,Josie,46C,Regalia,44D,Jodee,46B,Large-shell,Stitch on L breast w/slight pain; special order Jodee padded 46 B Red/Black/Blue,—,—,—,—,—,—
+26,11109,2/26/22,56,,Bilateral,Mastectomy,35,40,C,—,Josie,40C,,,,,7,Dual Cool Layer (2) 7; Barbara 40 C MB & Latte; Custom 09N; special order black ship to home,—,Yes,Yes,Yes,Yes,—
+27,10087,3/21/22,51,African American,Bilateral,Mastectomy,36.5,40,D,—,Josie,42C,,,,,8,Myya 42 C Black/Latte; Trulife Sandstone 42 C; Active Forms Size 9,—,Yes,Yes,Yes,—,—
+Duplicate,11005,9/19/22,64,African American,Right,Lumpectomy,43,46,B,Average,Josie,46C,Lara,44B,Regalia,44D,Large-shell,"Jodee padded 46 B Red, Black, Blue (same patient follow-up)",—,—,—,—,—,—
+28,11182,5/3/22,80,African American,Left,Mastectomy,41,46,H/I,Shallow,,,Nancy ,46G,,,15,Wearing Elila Soft Cup w/ Amoena 442 Ivory 15; tried Natura Light 2S 16 Tawny & Cate 46 H; would need 46 I for better fit — declined purchase today,—,—,—,—,—,Aiesha Taylor
+29,11039,2/10/22,62,Latina,Left,Mastectomy,32,38,DDD/F,Full,n/a,n/a,Nancy ,40G,Regalia,38F,12,Needs prosthesis that hugs side for symmetry; will order 1 more bra,39,Yes,—,—,Yes,Aiesha Taylor
+30,10967,7/11/22,66,,Left,Mastectomy,41,46,DD,Average,n/a,n/a,Nancy ,46E,Nancy,44G,14,Bra too snug / prosthesis too big — refitted for better symmetry; Dual Cool Layer 14 + Nancy 46 DD (MB + Grey S/O),—,Yes,Yes,Yes,Yes,Aiesha Taylor
+31,11143,3/23/23,80,African American,Left,Mastectomy,34.5,40,B,Shallow,Josie,42C,Lily,40C,,,6,Doesn’t like Barbara — wants more structured bras; tried Lily & Karolina (likes both); will order Mara 40 A/AA later (S/O Lily 40 C black ×3),—,—,—,—,—,Deaneas Morris
+duplicate,10967,12/5/21,66,,,,36,40,,Full,,,,,,,,—,20,—,—,—,—,Aiesha Taylor
+32,10135,12/15/21,87,,Left,Mastectomy,40,40,B,Shallow,Josie,42C,Josie,42B,,,3,"Interested in Trulife 915 Dual Cool Layer Size 3 + Barbara 210 42 B (Black, Midnight Blue, Nude)",18,Yes,Yes,—,—,Aiesha Taylor
+33,10937,11/21/21,68,,Right,Mastectomy,35.5,42,DD/E,Average,n/a,n/a,Lara,42E,,,11,—,21,Yes,Yes,—,—,Aiesha Taylor
+34,10974,12/8/21,82,,Right,Mastectomy,31,40,B,Shallow,Josie,40B,,,,,6,"Barbara Special Order Exotic Latte & Latte; ABC 516 38 B, 40 B",—,Yes,Yes,—,Yes,Aiesha Taylor
+35,11034,1/31/22,66,,Left,Mastectomy,37,42,D,Shallow,n/a,n/a,Nancy ,42D,Isadora,42E,11,,—,Yes,Yes,Yes,Yes,Aiesha Taylor
+36,11135,3/26/22,71,,Left,Mastectomy,35,40,C,Shallow,Josie,40C,,,,,5,Special Order Barbara 40 C Black & White,—,Yes,Yes,—,Yes,Aiesha Taylor
+37,10122,8/10/22,64,,Right,Mastectomy,35,40,DDD/F,—,n/a,n/a,Nancy ,40G,,,10,"Fitted in Barbara 40 F, Active 10; awaiting SWO for dispensing",—,Yes,Yes,Yes,—,Yolanda Butler
+38,10559,2/20/22,72,,Bilateral, Mastectomy,36,42,F,Average,Josie,42E,,,,,12,Special order Regalia 42 F Grey/Black; fallback Barbara 42 F MB,—,Yes,Yes,Yes,Yes,Deaneas Morris
+39,41,—,,,,Mastectomy,32,36,D,—,,,,,,,,Bilateral mastectomy; skin normal; incisions well healed; new bras and size required,16,—,—,—,Yes,Deaneas Morris
+40,11119,4/3/22,86,,Bilateral,Mastectomy,36,40,D,Shallow,Josie,42D,Josie,40D,,,9,Special order Barbara Latte/White/Black; Trulife Dual Cool Encore Size 9 (best fit),—,Yes,Yes,—,Yes,Aiesha Taylor
+41,11129,3/15/22,77,,Right,Mastectomy,34,38,D,Full,Mae,38D,Daniela,38D,Alexandra,38D,XL-shell,Special order Daniela 38 D Black/Nude,40.5,—,—,—,—,Aiesha Taylor
+42,11169,4/6/22,76,,Left,Mastectomy,33,40,C,Shallow,Josie,40C,Regalia,40B,Jessica,40C,7,Wearing size 7 Amoena; Regalia 40 B Black & Beige; Jessica 40 C Black,—,Yes,Yes,—,Yes,Aiesha Taylor
+43,11040,3/5/22,63,,Bilateral,Mastectomy,35,40,C,—,n/a,n/a,Regalia,40C,,,8,Needs SWO for 2 prostheses; KP authorized only 1; Dual Cool Layer (2) 8; Regalia Black 40 C (on hold); Exotic Latte 40 D (S/O),—,—,—,—,—,Aiesha Taylor
+44,10968,12/15/21,68,,Left,Mastectomy,41,44,DDD/F,Shallow,n/a,n/a,Regalia,46F,Regalia,44F,14,—,—,Yes,—,—,Yes,—
+45,10979,2/9/22,75,,Left,Mastectomy,36.5,40,D,Average,Josie,40D,,,,,8,First-time fitting; Amoena 474 Size 8; Barbara 40 D Black (S/O),—,Yes,Yes,—,Yes,Deaneas Morris
+46,11143,3/26/22,78,,Left,Mastectomy,36,42,B,Shallow,Josie,42C,Lily,40C,,,6,Likes Barbara; fitted in 42 B (Special Order),—,Yes,Yes,Yes,Yes,Aiesha Taylor
+47,11053,4/6/22,52,,Left,Lumpectomy,39,42,A,Shallow / Fat Transfer,Josie,42A,,,,,2,Partial shell helped balance; between 44 A (too big) & 42 A (slightly tight),—,Yes,Yes,—,Yes,Aiesha Taylor
+48,10971,12/3/21,59,,Right,Mastectomy,34,38,D,Shallow,Josie,40E,,,,,10,—,21,—,—,—,—,Aiesha Taylor
+New data,,,,,,,,,,,,,,,,,,,,,,,,
+49,10961,11/29/21,62,,Right,Lumpectomy,36,42,C,Average,Josie,42C,Josie,42C,,,n/a,,,,,,,
+50,10728,11/29/21,53,African American,Right,mastectomy,38,,,Full,,,Nancy,40G,,,12,,,,,,,
+51,10973,12/14/21,78,,Right,mastectomy,32,36,B,Shallow / Fat Transfer,Josie,36B,ABC T-shirt,36A,,,4,,,,,,,
+52,10972,12/17/21,65,,Left,mastectomy,38,,,,n/a,,Regalia,44A,Regalia,44A,med-shell,,,,,,,
+53,10917,12/6/21,72,African American,Right,Lumpectomy,30,36,C,Shallow,Josie,38D,,,,,n/a,,,,,,,
+54,11010,1/10/22,47,African American,Bilateral,Mastectomy,40,42,E,Average,Josie,42D,Mara,42E,,,9,,,,,,,
+55,10128,11/15/21,72,African American,Left,Lumpectomy,32,36,,Average,Josie,36D,,,,,Large-shell,,,,,,,
+56,10997,1/31/22,55,,Right,Mastectomy,32,36,E,Shallow,Josie,36E,,,,,8,,,,,,,
+57,11101,2/28/22,79,,Right,Lumpectomy,32,38,D,Shallow ,Josie,40C,Josie,38D,,,n/a,,,,,,,
+58,11037,1/25/22,72,,Left,Mastectomy,38,46,C,Shallow,Josie,46C,Nancy ,46C,,,10,,,,,,,
+59,11143,3/26/22,79,,Left,Mastectomy,36,42,B,Shallow,Josie,42C,Lily,40C,,,6,,,,,,,
+60,10756,10/22/21,72,,Right,Mastectomy,30,36,G,Shallow,n/a,n/a,Regalia,36G,Isadora,34G,11,,,,,,,
+61,11118,3/5/22,63,,Left,Mastectomy,41,48,C,Average,Josie,48C,Regalia,48C,,,10,,,,,,,
+62,11846,7/5/23,86,,Right,Mastectomy,33,38,C,Shallow,Josie,38C,,,,,4,,,,,,,
+63,11772,5/17/23,46,,Left,Mastectomy,39,44,H,Average,n/a,n/a,Nancy,44G,,,14,,,,,,,
+64,10148,1/14/23,60,,Right,Mastectomy,40,44,G,Full,n/a,n/a,Regalia,44G,,,14,,,,,,,
+65,11946,8/31/23,61,,Right,Mastectomy,36,40,E,Average,Josie,38F,Mara,40E,,,10,,,,,,,
+66,11652,3/11/23,64,,Bilateral,Mastectomy,38,44,D,Full,Josie,44D,Daniela,44B,Alexandra,44B,11,,,,,,,
+67,10297,6/12/23,60,,Left,Mastectomy,35,40,C,Shallow,Mae,38C,Alexandra,40A,Jodee,38C,6,,,,,,,
+68,10339,7/10/23,80,,Left,Mastectomy,30,36,C,Average,Josie,36C,Regalia,36B,,,5,,,,,,,
+69,11567,7/20/23,36,,Left,Mastectomy,38,42,D,Average,Josie,42D,Nancy ,42E,,,8,,,,,,,
+70,11671,3/6/23,76,,Bilateral,Mastectomy,30,36,D,Average,Josie,36C,Lily,36D,,,6,,,,,,,
+71,11819,6/23/23,91,,Right,Lumpectomy,39,48,C,Average,Josie,48C,Josie,48D,,,4,,,,,,,
+72,10902,8/29/23,70,,Right,Mastectomy,32,40,C,Average,Josie,40C,Marie,40B,,,7,,,,,,,
+73,10580,6/25/23,52,,Right,Mastectomy,32,36,B,Average,Josie,36C,Daniela,36B,Alexandra,36B,6,,,,,,,
+74,11869,9/29/23,78,,Left,Mastectomy,37,42,A,,Josie,42A,Marie,42A,,,5,,,,,,,
+75,10759,1/12/22,65,African American,Right,Mastectomy,36,42,G,Full,n/a,n/a,Nancy,42G,Regalia,42G,14,,,,,,,
+76,10768,7/17/22,81,African American,Right,Mastectomy,36,42,B,Average,Josie,40C,Josie,40C,Josie,40C,6,,,,,,,
+77,10625,10/8/22,71,African American,Right,Lumpectomy,46,50,D,Full,Josie,50C,Josie,50D,Nancy,50C,n/a,,,,,,,
+78,10502,10/23/21,69,African American,Left,Mastectomy,33,40,D,Average,Josie,40F,Alexandra,40D,Josie,40F,n/a,,,,,,,
+,10057,7/27/22,68,African American,Left,Mastectomy,36,38,C,Average,Vivian,38C,Amelia,38C,Regalia,38C,n/a,,,,,,,
+,10096,11/23/21,71,African American,Right,Mastectomy,39,46,C,Shallow,Josie,46D,Regalia,46B,Josie,46D,11,,,,,,,
+,10097,10/26/22,61,African American,Left,Lumpectomy,38,42,F,Average,Josie,42F,Jessica,42F,Josie,42F,n/a,,,,,,,
+,10098,6/28/22,64,African American,Left,Mastectomy,35,40,G,Average,Josie,40E,Nancy ,40E,Josie,40E,12,,,,,,,
+,10012,3/2/22,71,African American,Bilateral,Mastectomy,41,46,C,Average,n/a,,Nancy,46C,Nancy,46C,12,,,,,,,
+,10015,4/26/22,68,Middle Eastern,Bilateral,Mastectomy,30,34,C,Average,Josie,34C,Josie,36C,Jodee,34C,4,,,,,,,
+,10020,6/28/22,62,White,Right,Mastectomy,37,42,E,Shallow,Josie,42E,Josie,42E,Josie,42E,XL-shell,,,,,,,
+,10351,1/3/22,65,White,Left,Mastectomy,34,40,A,Shallow,Josie,40A,Josie,40A,Josie,40A,4,,,,,,,
+,10357,4/22/23,46,African American,Right,Mastectomy,36,40,B,Average,Josie,40B,Josie,40B,Josie,40B,4,,,,,,,
+,10360,7/13/23,83,African American,Left,Mastectomy,42,46,D,Shallow,Josie,46D,Josie,48D,Josie,46D,10,,,,,,,
+,10368,12/6/21,66,African American,Right,Mastectomy,33,40,C,Shallow,n/a,n/a,Alexandra,38C,Lara,40C,Med-shell,,,,,,,
+,10406,2/19/22,37,African American,Bilateral ,Mastectomy,33,38,C,Average,Josie,38C,Regalia,38C,Jodee,38C,n/a,,,,,,,
+,10426,2/16/22,73,White,Right,Lumpectomy,30,36,E,Average,Josie,38D,Nancy,36F,Regalia,36E,n/a,,,,,,,
+,10460,7/26/22,75,African American,Bilateral,Mastectomy,35,40,D,Average,Josie,40D,Josie,40D,Josie,40D,10,,,,,,,
+,10480,11/17/21,68,African American,Right,Lumpectomy,46,50,D,Average,Vivian,2XL,Regalia,50D,Regalia,50D,n/a,,,,,,,
+,10522,11/15/21,44,African American,Bilateral,Mastectomy,33,38,C,Average,Josie,38C,Lara,40B,Josie,38C,n/a,,,,,,,
+,10525,3/22/23,65,African American,Right,Mastectomy,37,42,C,Average,Josie,42C,Josie,42C,Nearly Me,42C,n/a,,,,,,,
+,10661,4/19/23,72,African American,Left,Mastectomy,42,46,F,Full,Josie,46F,Nancy,46F,Nancy,46F,13,,,,,,,
+,10670,11/12/21,88,African American,Right,Lumpectomy,34,38,E,Shallow,Josie,38E,Nancy 38E,38E,Nancy ,38E,n/a,,,,,,,
+,10694,4/14/23,51,African American,Left,Mastectomy,44,48,C,Full,Josie,46E,Regalia,48B,Nancy,46C,11,,,,,,,
