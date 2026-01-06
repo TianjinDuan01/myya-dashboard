@@ -739,23 +739,3 @@ else:
                 table(seg_size, height=220)
 
 st.markdown('</div>', unsafe_allow_html=True)
-
-
-# =========================
-# CLOSING
-# =========================
-st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
-st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
-st.markdown('<div class="blockKicker">Closing</div>', unsafe_allow_html=True)
-st.markdown('<div class="blockHeadline">This is measurable replacement — not a marketing claim.</div>', unsafe_allow_html=True)
-st.markdown(
-    f"""
-<div class="blockBody">
-For CEOs and customers: <span class="pill">alternatives are considered</span>, and Myya is still selected at a high rate.
-That’s the simplest, most credible story to put on the website — backed by interactive evidence.
-</div>
-    """,
-    unsafe_allow_html=True
-)
-st.caption("Note: Method labels are intentionally hidden to avoid buyer confusion; internal scoring ensures correctness.")
-st.markdown('</div>', unsafe_allow_html=True)
