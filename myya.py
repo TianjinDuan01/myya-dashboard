@@ -1,3 +1,4 @@
+
 import io
 import numpy as np
 import pandas as pd
@@ -55,7 +56,11 @@ MUTED = "#6b7280"
 # =========================
 # STREAMLIT PAGE
 # =========================
-st.set_page_config(page_title="Myya — Executive Story", layout="wide")
+st.set_page_config(
+    page_title="Myya — Executive Story",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 st.markdown(
     f"""
@@ -93,7 +98,11 @@ header {{visibility: hidden;}}
 
 PLOTLY_LAYOUT_BASE = dict(
     margin=dict(l=10, r=10, t=55, b=10),
-    font=dict(family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial", size=13, color=INK),
+    font=dict(
+        family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+        size=13,
+        color=INK,
+    ),
     title=dict(font=dict(size=16, color=INK)),
 )
 
@@ -107,6 +116,7 @@ def plot(fig):
         st.plotly_chart(fig, width="stretch")
     except TypeError:
         st.plotly_chart(fig, use_container_width=True)
+
 
 def table(df, height=260):
     """Dataframe, uses stretch width if supported."""
@@ -124,18 +134,22 @@ def series_clean_str(s: pd.Series) -> pd.Series:
     s = s.replace({"": np.nan, "nan": np.nan, "None": np.nan, "—": np.nan, "–": np.nan})
     return s
 
+
 def pct(x, digits=0):
     if pd.isna(x):
         return "—"
     return f"{x*100:.{digits}f}%"
 
+
 def safe_nunique(s: pd.Series) -> int:
     return int(s.dropna().nunique()) if s is not None else 0
+
 
 def interval_to_label(x):
     if isinstance(x, pd.Interval):
         return f"{x.left:g}–{x.right:g}"
     return str(x)
+
 
 def cramers_v(cm: np.ndarray) -> float:
     if cm.size == 0:
@@ -150,6 +164,7 @@ def cramers_v(cm: np.ndarray) -> float:
         return np.nan
     return float(np.sqrt((chi2 / n) / denom))
 
+
 def eta_squared_by_groups(num: pd.Series, grp: pd.Series) -> float:
     sub = pd.DataFrame({"num": num, "grp": grp}).dropna()
     if sub.empty or sub["grp"].nunique() < 2:
@@ -161,8 +176,9 @@ def eta_squared_by_groups(num: pd.Series, grp: pd.Series) -> float:
     ss_between = sub.groupby("grp")["num"].apply(lambda x: len(x) * (x.mean() - grand_mean) ** 2).sum()
     return float(ss_between / ss_total)
 
+
 def driver_strength_internal(df, feature, target_cat):
-    # method labels intentionally hidden; internal scoring only
+    # Method labels intentionally hidden; internal scoring only.
     if feature not in df.columns or target_cat not in df.columns:
         return np.nan
     if pd.api.types.is_numeric_dtype(df[feature]):
@@ -173,16 +189,22 @@ def driver_strength_internal(df, feature, target_cat):
     ct = pd.crosstab(sub[feature], sub[target_cat]).values
     return cramers_v(ct)
 
+
 def impact_level(v: float) -> str:
-    if pd.isna(v): return "—"
-    if v >= 0.30: return "High"
-    if v >= 0.10: return "Medium"
+    if pd.isna(v):
+        return "—"
+    if v >= 0.30:
+        return "High"
+    if v >= 0.10:
+        return "Medium"
     return "Low"
+
 
 def hhi(shares: np.ndarray) -> float:
     if shares is None or len(shares) == 0:
         return np.nan
     return float(np.sum(np.square(shares)))
+
 
 def card(title, value, note, pink=False):
     cls = "card cardPink" if pink else "card"
@@ -194,8 +216,9 @@ def card(title, value, note, pink=False):
   <div class="cardNote">{note}</div>
 </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
+
 
 @st.cache_data(show_spinner=False)
 def load_and_clean_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -213,7 +236,11 @@ def load_and_clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
     for c in ["Patient Surgery Type", "Side", "Breast Projection (Profile)"]:
         if c in df.columns:
-            df[c] = series_clean_str(df[c]).str.replace(r"\s+", " ", regex=True).str.title()
+            df[c] = (
+                series_clean_str(df[c])
+                .str.replace(r"\s+", " ", regex=True)
+                .str.title()
+            )
 
     for c in ["Patient Age", "Underbust Measurement (in)", "Bra Size (Band Size)", "Sternum→Back (in)"]:
         if c in df.columns:
@@ -221,15 +248,28 @@ def load_and_clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def normalize_data_url(url: str) -> str:
     url = (url or "").strip()
     if not url:
         return url
+
     # Google Drive share link -> direct download
     if "drive.google.com" in url and "/file/d/" in url:
         file_id = url.split("/file/d/")[1].split("/")[0]
         return f"https://drive.google.com/uc?export=download&id={file_id}"
+
+    # GitHub blob -> raw
+    if url.startswith("https://github.com/") and "/blob/" in url:
+        parts = url.replace("https://github.com/", "").split("/")
+        # parts: [user, repo, 'blob', branch, ...path]
+        if len(parts) >= 5 and parts[2] == "blob":
+            user, repo, _, branch = parts[:4]
+            path = "/".join(parts[4:])
+            return f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"
+
     return url
+
 
 @st.cache_data(show_spinner=False)
 def load_csv_from_url(url: str) -> pd.DataFrame:
@@ -237,6 +277,7 @@ def load_csv_from_url(url: str) -> pd.DataFrame:
     r = requests.get(url, timeout=REQUEST_TIMEOUT)
     r.raise_for_status()
     return pd.read_csv(io.BytesIO(r.content))
+
 
 def get_data_url() -> str:
     # 1) Streamlit secrets (Cloud). Local run may have no secrets.toml -> must not crash.
@@ -259,35 +300,25 @@ def get_data_url() -> str:
 
 
 # =========================
-# SIDEBAR (URL + global controls FIRST)
+# SIDEBAR (website-facing: no data source controls here)
 # =========================
 with st.sidebar:
-    st.markdown("## Data source")
-    data_url_input = st.text_input(
-        "CSV URL (optional override)",
-        value="",
-        placeholder="https://.../your.csv",
-        help="Leave empty to use Streamlit Secrets (DATA_URL) or ?data= query param."
-    )
-
     st.markdown("## Controls")
     top_n = st.slider("Top N items", 5, 20, 10)
     show_details = st.toggle("Show detail tables", value=False)
 
 
 # =========================
-# LOAD DATA (MUST happen AFTER data_url_input exists)
+# LOAD DATA (URL ONLY)
 # =========================
-data_url = (data_url_input or "").strip() or get_data_url()
-data_url = normalize_data_url(data_url)
+data_url = normalize_data_url(get_data_url())
 
 if not data_url:
     st.error(
         "No data URL provided.\n\n"
         "Provide one of the following:\n"
-        "• Streamlit Secrets: DATA_URL=\"https://...csv\"\n"
+        "• Streamlit Secrets: DATA_URL = \"https://...csv\"\n"
         "• Query param: ?data=https://...csv\n"
-        "• Sidebar input: CSV URL"
     )
     st.stop()
 
@@ -299,7 +330,6 @@ except Exception as e:
 
 df = load_and_clean_df(raw_df)
 
-# Validate required columns early
 for req in [TARGET_BRA, TARGET_SIZE]:
     if req not in df.columns:
         st.error(f"Missing required column: {req}")
@@ -307,7 +337,7 @@ for req in [TARGET_BRA, TARGET_SIZE]:
 
 
 # =========================
-# SIDEBAR (filters AFTER data loaded)
+# SIDEBAR FILTERS (optional, still useful)
 # =========================
 with st.sidebar:
     st.divider()
@@ -330,10 +360,6 @@ with st.sidebar:
     if "Patient Age" in df.columns and pd.api.types.is_numeric_dtype(df["Patient Age"]) and df["Patient Age"].notna().any():
         mn, mx = float(df["Patient Age"].min()), float(df["Patient Age"].max())
         age_range = st.slider("Age range", mn, mx, (mn, mx))
-
-    st.divider()
-    driver_options = [c for c in BUSINESS_DRIVER_CANDIDATES if c in df.columns]
-    picked_driver = st.selectbox("Driver spotlight", driver_options, index=0 if driver_options else 0)
 
 
 # =========================
@@ -362,14 +388,13 @@ st.markdown('<div class="heroTitle">Myya wins against alternatives</div>', unsaf
 st.markdown(
     """
 <div class="heroSub">
-This page is designed for CEOs and website visitors: it starts with replacement proof in real-world decisions,
-explains what drives repeatability, and ends with where to scale next.
+Designed for CEOs and website visitors: we start with replacement proof, explain what drives repeatability,
+then show where to scale next.
 </div>
 <hr class="divider"/>
     """,
     unsafe_allow_html=True
 )
-
 
 # =========================
 # KPIs (replacement-first)
@@ -406,8 +431,6 @@ with k3: card("Myya selected anyway", pct(win_rate, 0) if win_rate is not None e
 with k4: card("Most replaced alternative", most_replaced if most_replaced is not None else "—", "Top competitor mentioned")
 with k5: card("Measurement completeness", pct(1-underbust_missing, 0) if pd.notna(underbust_missing) else "—", "Underbust recorded")
 
-st.caption(f"CSV URL: {data_url}")
-
 
 # =========================
 # STORY BLOCK 1 — Proof (Replacement)
@@ -425,7 +448,7 @@ else:
         unsafe_allow_html=True
     )
     st.markdown(
-        '<div class="blockBody">CEO/website-friendly view: which alternatives are most often replaced, and which Myya products win.</div>',
+        '<div class="blockBody">Buyer-friendly view: which alternatives are most often replaced, and which Myya products win.</div>',
         unsafe_allow_html=True
     )
 
@@ -454,10 +477,9 @@ else:
                 x="replaced_cases",
                 y="competitor",
                 orientation="h",
-                title="Most replaced alternatives (Leaderboard)",
                 hover_data={"share": ":.1%"},
             )
-            fig.update_layout(**PLOTLY_LAYOUT_BASE)
+            fig.update_layout(**PLOTLY_LAYOUT_BASE, title_text="Most replaced alternatives (Leaderboard)")
             plot(fig)
 
         with right:
@@ -467,8 +489,8 @@ else:
             mat2 = mat[mat["competitor"].isin(top_comp) & mat[TARGET_BRA].isin(top_myya)].copy()
             pivot = mat2.pivot_table(index="competitor", columns=TARGET_BRA, values="count", aggfunc="sum", fill_value=0)
 
-            fig2 = px.imshow(pivot, aspect="auto", title="Replacement map (competitor → selected Myya)")
-            fig2.update_layout(**PLOTLY_LAYOUT_BASE)
+            fig2 = px.imshow(pivot, aspect="auto")
+            fig2.update_layout(**PLOTLY_LAYOUT_BASE, title_text="Replacement map (competitor → selected Myya)")
             plot(fig2)
 
         if show_details:
@@ -478,7 +500,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =========================
-# STORY BLOCK 2 — Why it wins (Drivers)
+# STORY BLOCK 2 — Why it wins (Drivers) + MAIN driver spotlight control
 # =========================
 st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
 st.markdown('<div class="storyBlock">', unsafe_allow_html=True)
@@ -495,17 +517,30 @@ drv = pd.DataFrame(drv_rows).dropna(subset=["Strength"]).sort_values("Strength",
 if drv.empty:
     st.info("Not enough data to compute driver ranking in this view.")
 else:
+    driver_options = drv["Driver"].tolist()
     top_driver = drv.iloc[0]["Driver"]
-    story_driver = picked_driver if (picked_driver in drv["Driver"].tolist()) else top_driver
 
-    st.markdown(
-        f'<div class="blockHeadline">Myya wins more consistently when <span class="pill">{top_driver}</span> is captured and used well.</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        '<div class="blockBody">We keep this buyer-friendly: plain language only (no method labels). Select a driver and see how the product mix shifts.</div>',
-        unsafe_allow_html=True
-    )
+    # ---- MAIN driver spotlight control (not sidebar) ----
+    headL, headR = st.columns([0.72, 0.28], gap="large")
+    with headL:
+        st.markdown(
+            f'<div class="blockHeadline">Myya wins more consistently when <span class="pill">{top_driver}</span> is captured and used well.</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            '<div class="blockBody">Select a driver and see how the product mix shifts (buyer-friendly, no method labels).</div>',
+            unsafe_allow_html=True
+        )
+
+    with headR:
+        picked_driver = st.selectbox(
+            "Driver spotlight",
+            driver_options,
+            index=driver_options.index(top_driver),
+            key="driver_spotlight_main"
+        )
+
+    story_driver = picked_driver
 
     L, R = st.columns([0.62, 0.38], gap="large")
 
@@ -517,10 +552,9 @@ else:
             x="Strength",
             y="Driver",
             orientation="h",
-            title="What drives consistent Myya selection",
             color="Highlight",
         )
-        fig.update_layout(**PLOTLY_LAYOUT_BASE, legend_title_text="")
+        fig.update_layout(**PLOTLY_LAYOUT_BASE, title_text="What drives consistent Myya selection", legend_title_text="")
         plot(fig)
 
     with R:
@@ -543,14 +577,13 @@ else:
     top_products = df_f[TARGET_BRA].dropna().astype(str).value_counts().head(5).index.tolist()
     sub = df_f[df_f[TARGET_BRA].astype(str).isin(top_products)].copy()
 
-    if pd.api.types.is_numeric_dtype(sub[story_driver]) if story_driver in sub.columns else False:
+    if story_driver in sub.columns and pd.api.types.is_numeric_dtype(sub[story_driver]):
         fig = px.box(
             sub.dropna(subset=[story_driver, TARGET_BRA]),
             x=TARGET_BRA,
             y=story_driver,
-            title=f"{story_driver} distribution across top Myya products",
         )
-        fig.update_layout(**PLOTLY_LAYOUT_BASE)
+        fig.update_layout(**PLOTLY_LAYOUT_BASE, title_text=f"{story_driver} distribution across top Myya products")
         plot(fig)
     else:
         tmp2 = sub.dropna(subset=[story_driver, TARGET_BRA]).copy()
@@ -561,16 +594,16 @@ else:
         share["share"] = share["count"] / share["total"]
         top_cats = tmp2[story_driver].value_counts().head(8).index.tolist()
         share = share[share[story_driver].isin(top_cats)]
+
         fig = px.bar(
             share,
             x="share",
             y=story_driver,
             color=TARGET_BRA,
             orientation="h",
-            title=f"Product share by {story_driver}",
             hover_data=["count"],
         )
-        fig.update_layout(**PLOTLY_LAYOUT_BASE)
+        fig.update_layout(**PLOTLY_LAYOUT_BASE, title_text=f"Product share by {story_driver}")
         plot(fig)
 
     if show_details:
@@ -597,26 +630,35 @@ top3 = float(mix_df["Share"].head(3).sum()) if len(mix_df) else np.nan
 std_index = hhi(mix_df["Share"].values)
 
 st.markdown('<div class="blockHeadline">Selection behavior is measurable — and can be standardized for scale.</div>', unsafe_allow_html=True)
-st.markdown('<div class="blockBody">This supports the win story: consistent selection patterns enable repeatable outcomes.</div>', unsafe_allow_html=True)
+st.markdown('<div class="blockBody">Consistent selection patterns enable repeatable outcomes.</div>', unsafe_allow_html=True)
 
 a, b, c = st.columns([0.44, 0.28, 0.28], gap="large")
 with a:
     show = mix_df.head(top_n).copy()
     fig = go.Figure()
     fig.add_trace(go.Bar(x=show["Myya Bra"], y=show["Count"], name="Count"))
-    fig.add_trace(go.Scatter(x=show["Myya Bra"], y=show["CumShare"], name="Cumulative share", yaxis="y2", mode="lines+markers"))
-    fig.update_layout(
-    **PLOTLY_LAYOUT_BASE,
-    title_text="Mix concentration (Pareto)",
-    xaxis_title="Myya product",
-    yaxis_title="Count",
-    yaxis2=dict(
-        title="Cumulative share",
-        overlaying="y",
-        side="right",
-        range=[0, 1],),
+    fig.add_trace(
+        go.Scatter(
+            x=show["Myya Bra"],
+            y=show["CumShare"],
+            name="Cumulative share",
+            yaxis="y2",
+            mode="lines+markers",
         )
-
+    )
+    fig.update_layout(
+        **PLOTLY_LAYOUT_BASE,
+        title_text="Mix concentration (Pareto)",
+        xaxis_title="Myya product",
+        yaxis_title="Count",
+        yaxis2=dict(
+            title="Cumulative share",
+            overlaying="y",
+            side="right",
+            range=[0, 1],
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
     plot(fig)
 
 with b:
@@ -625,8 +667,8 @@ with b:
 
 with c:
     card("Standardization index", f"{std_index:.2f}" if pd.notna(std_index) else "—", "Higher = more concentrated behavior", pink=True)
-    fig2 = px.treemap(mix_df.head(20), path=["Myya Bra"], values="Count", title="Mix map")
-    fig2.update_layout(**PLOTLY_LAYOUT_BASE)
+    fig2 = px.treemap(mix_df.head(20), path=["Myya Bra"], values="Count")
+    fig2.update_layout(**PLOTLY_LAYOUT_BASE, title_text="Mix map")
     plot(fig2)
 
 if show_details:
@@ -646,7 +688,7 @@ seg_options = [c for c in SEGMENT_FIELDS if c in df_f.columns]
 if not seg_options:
     st.info("No segment fields found in this dataset for the scaling view.")
 else:
-    seg_field = st.selectbox("Segment lens (for scaling decisions)", seg_options, index=0)
+    seg_field = st.selectbox("Segment lens (for scaling decisions)", seg_options, index=0, key="segment_lens")
 
     work = df_f.copy()
     if pd.api.types.is_numeric_dtype(work[seg_field]):
@@ -663,7 +705,7 @@ else:
         st.info("Not enough data for segment opportunity charts.")
     else:
         st.markdown('<div class="blockHeadline">Prioritize rollout where volume is high — and wins are repeatable.</div>', unsafe_allow_html=True)
-        st.markdown('<div class="blockBody">This helps decide rollout, inventory alignment, and messaging by segment.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="blockBody">Supports rollout, inventory alignment, and messaging by segment.</div>', unsafe_allow_html=True)
 
         seg_mix = sub.groupby(["_seg", TARGET_BRA]).size().reset_index(name="count")
         seg_tot = seg_mix.groupby("_seg")["count"].sum().reset_index(name="total")
@@ -681,17 +723,16 @@ else:
                 y="_seg",
                 color=TARGET_BRA,
                 orientation="h",
-                title=f"Product mix by segment ({seg_field})",
                 hover_data=["count"],
             )
-            fig.update_layout(**PLOTLY_LAYOUT_BASE)
+            fig.update_layout(**PLOTLY_LAYOUT_BASE, title_text=f"Product mix by segment ({seg_field})")
             plot(fig)
 
         with R:
             seg_size = sub["_seg"].value_counts().reset_index()
             seg_size.columns = ["Segment", "Cases"]
-            fig2 = px.bar(seg_size.iloc[::-1], x="Cases", y="Segment", orientation="h", title="Segment volume")
-            fig2.update_layout(**PLOTLY_LAYOUT_BASE)
+            fig2 = px.bar(seg_size.iloc[::-1], x="Cases", y="Segment", orientation="h")
+            fig2.update_layout(**PLOTLY_LAYOUT_BASE, title_text="Segment volume")
             plot(fig2)
 
             if show_details:
