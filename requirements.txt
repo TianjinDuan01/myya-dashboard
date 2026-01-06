@@ -1,0 +1,6 @@
+streamlit>=1.33
+altair>=5.2
+pandas>=2.1
+numpy>=1.26
+matplotlib>=3.8
+st-gsheets-connection>=0.1.0
