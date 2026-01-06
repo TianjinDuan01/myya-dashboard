@@ -19,7 +19,27 @@ from sklearn.ensemble import RandomForestClassifier
 # =========================
 # CONFIG
 # =========================
-DATA_PATH = "/Users/duanxiaobai/Desktop/DSBI/Myya Sample dataset.csv"
+# ---- DATA LOADING (URL ONLY) ----
+data_url = data_url_input.strip() or get_data_url()
+data_url = normalize_data_url(data_url)
+
+if not data_url:
+    st.error(
+        "No data URL provided.\n\n"
+        "Provide one of the following:\n"
+        "• Streamlit Secrets: DATA_URL=\"https://...csv\"\n"
+        "• Query param: ?data=https://...csv\n"
+        "• Sidebar input: CSV URL"
+    )
+    st.stop()
+
+try:
+    raw_df = load_csv_from_url(data_url)
+except Exception as e:
+    st.error(f"Failed to load CSV from URL:\n{data_url}\n\nError: {e}")
+    st.stop()
+
+df = load_and_clean_df(raw_df)
 
 TARGET_BRA = "Myya Bra"
 TARGET_SIZE = "Myya Bra Size"
